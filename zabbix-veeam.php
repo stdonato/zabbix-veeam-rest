@@ -5,7 +5,7 @@
 // ver 0.3
 // glukinho
 
-const LOCAL_TIMEZONE = "Europe/Moscow";
+const LOCAL_TIMEZONE = "America/Manaus";
 
 $results = [
 	'Success'	=> 0,
@@ -15,7 +15,7 @@ $results = [
 
 $debug_file = '/tmp/zabbix-veeam.log';
 
-$debug = true;
+$debug = false;
 
 
 function _dbg($text) {
@@ -54,6 +54,8 @@ function curl($url, $RestSvcSessionId = false, $post = false) {
 		CURLOPT_HEADER			=> false,
 		CURLOPT_POST			=> $post,
 		CURLOPT_RETURNTRANSFER	=> true,
+		CURLOPT_SSL_VERIFYPEER  => false,
+		CURLOPT_SSL_VERIFYHOST  => false,
 	);
 	curl_setopt_array($ch, $curlConfig);
 	curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
@@ -71,10 +73,9 @@ function curl($url, $RestSvcSessionId = false, $post = false) {
 	
 	$output = substr($output, 3); // against UTF BOM issue: https://stackoverflow.com/questions/689185/json-decode-returns-null-after-webservice-call
 	
-	return json_decode($output);
+	//return json_decode($output);
+	return $output;
 }
-
-
 
 
 $url_str = $argv[1];
@@ -82,10 +83,11 @@ $url = parse_url($url_str);
 
 foreach ($url as $key => $value) $$key = $value;
 
-
 $action = $argv[2];
 
-
+//user and password for API authentication
+$cred = "user:password";
+$cred_encoded = base64_encode($cred);
 
 //
 // Veeam REST API authorization
@@ -95,24 +97,28 @@ $action = $argv[2];
 //
 $ch = curl_init();
 $curlConfig = array(
-	CURLOPT_URL				=> $url_str . "sessionMngr/?v=latest",
-	CURLOPT_VERBOSE			=> false,
-	CURLOPT_HEADER			=> false,
-	CURLOPT_POST			=> true,
+	CURLOPT_URL		=> $url_str . "sessionMngr/?v=latest",
+	CURLOPT_VERBOSE		=> false,
+	CURLOPT_HEADER		=> false,
+	CURLOPT_POST		=> true,
 	CURLOPT_RETURNTRANSFER	=> true,
+	CURLOPT_SSL_VERIFYPEER  => false,
+	CURLOPT_SSL_VERIFYHOST  => false,
 );
 curl_setopt_array($ch, $curlConfig);
 curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
 	'Content-Type: application/xml; charset=utf-8', 
 	'Content-Length: 0', 
-	'Accept: application/json'
+	'Accept: application/json',
+	'Authorization: Basic '.$cred_encoded
 ]);
 curl_setopt($ch, CURLOPT_HEADERFUNCTION, "handle_header");
 
 $output = curl_exec($ch);
 curl_close($ch);
 
+//echo $RestSvcSessionId;
 
 if (!$RestSvcSessionId) {
 	$msg = 'X-RestSvcSessionId header not set';
@@ -123,20 +129,18 @@ if (!$RestSvcSessionId) {
 // end of authorization
 //
 
-
-
-
-
-
 switch ($action) {
 	case "discoverRepo":
 		$data = curl($url_str . "repositories?format=Entity", $RestSvcSessionId);
 		
-		// print_r($data);
-		
+		$data = json_decode('{"R'.$data);
+		//print_r($data);
+
+		//$data = json_decode($data);
+		//echo $discovery->Name;		
 		$discovery = new StdClass();
 		$discovery->data = array();
-		
+	
 		foreach ($data->Repositories as $r) {
 			$repo = (object) [ '{#REPONAME}' => $r->Name ];
 			$discovery->data[] = $repo;
@@ -157,7 +161,7 @@ switch ($action) {
 	
 		$repo_name = $argv[3];
 		$data = curl($url_str . "repositories?format=Entity", $RestSvcSessionId);
-		
+		$data = json_decode('{"R'.$data);
 		// print_r($data);
 		
 		$repos = array();
@@ -182,10 +186,11 @@ switch ($action) {
 		
 		
 	case "discoverBackupJobs":
-		$url_var = urlencode("query?type=Job&filter=JobType==Backup,JobType==BackupCopy&format=entities");
+		$url_var = "query?type=Job&filter=JobType==Backup,JobType==BackupCopy&format=entities";
 		$data = curl($url_str . $url_var, $RestSvcSessionId);
 		
-		// print_r($data);
+		$data = json_decode('{"R'.$data);
+		//print_r($data);
 		
 		$discovery = new StdClass();
 		$discovery->data = array();
@@ -209,10 +214,10 @@ switch ($action) {
 		if (!isset($argv[3])) die('no job name provided');
 		
 		$job_name = $argv[3];
-		$url_var = urlencode("query?type=BackupJobSession&filter=JobName==\"{$job_name}\"&sortDesc=EndTime&pageSize=1&format=entities");
+		$url_var = "query?type=BackupJobSession&filter=JobName==\"{$job_name}\"&sortDesc=EndTime&pageSize=1&format=entities";
 		// print_r($url_var);
 		$data = curl($url_str . $url_var, $RestSvcSessionId);
-		
+		$data = json_decode('{"R'.$data);
 		// print_r($data);
 		
 		$creationtime = new DateTime($data->Entities->BackupJobSessions->BackupJobSessions[0]->CreationTimeUTC, new DateTimeZone('UTC'));
@@ -247,9 +252,9 @@ switch ($action) {
 
 		
 	case "discoverReplicaJobs":
-		$url_var = urlencode("query?type=Job&filter=JobType==Replica&format=entities");
+		$url_var = "query?type=Job&filter=JobType==Replica&format=entities";
 		$data = curl($url_str . $url_var, $RestSvcSessionId);
-		
+		$data = json_decode('{"R'.$data);
 		// print_r($url_var);
 		
 		// print_r($data);
@@ -284,10 +289,10 @@ switch ($action) {
 		if (!isset($argv[3])) die('no job name provided');
 		
 		$job_name = $argv[3];
-		$url_var = urlencode("query?type=ReplicaJobSession&filter=JobName==\"{$job_name}\";Result==Success&sortDesc=EndTime&pageSize=1&format=entities");
+		$url_var = "query?type=ReplicaJobSession&filter=JobName==\"{$job_name}\";Result==Success&sortDesc=EndTime&pageSize=1&format=entities";
 		// print_r($url_var);
 		$data = curl($url_str . $url_var, $RestSvcSessionId);
-		
+		$data = json_decode('{"R'.$data);
 		// print_r($data);
 		
 		$creationtime = new DateTime($data->Entities->ReplicaJobSessions->ReplicaJobSessions[0]->CreationTimeUTC, new DateTimeZone('UTC'));
@@ -322,8 +327,10 @@ switch ($action) {
 
 
 	case "discoverAgentJobs":
-		$url_var = urlencode("query?type=AgentBackupJob&format=entities");
+		$url_var = "query?type=AgentBackupJob&format=entities";
 		$data = curl($url_str . $url_var, $RestSvcSessionId);
+		$data = json_decode('{"R'.$data);
+		//print_r($data);
 		
 		$discovery = new StdClass();
 		$discovery->data = array();
@@ -346,12 +353,3 @@ switch ($action) {
 		_dbg($action . " - unknown action");
 		die('unknown action: '.$action);
 }
-
-
-
-
-
-
-
-
-
