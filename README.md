@@ -1,5 +1,6 @@
 # zabbix-veeam-rest
 Zabbix template and php script for monitoring Veeam B&R jobs and repositories.
+Based in https://github.com/glukinho/zabbix-veeam-rest
 
 ## How it works
 It uses Veeam REST API: https://helpcenter.veeam.com/docs/backup/rest/overview.html?ver=100 JSON mode only is now supported, XML is not.
