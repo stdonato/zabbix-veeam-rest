@@ -1,7 +1,7 @@
 # zabbix-veeam-rest
 Zabbix template and php script for monitoring Veeam B&R jobs and repositories.
 
-#Updated to work with Zabbix 4.4 and Veeam B&R 10.
+# Updated to work with Zabbix 4.4 and Veeam B&R 10.
 
 Based in https://github.com/glukinho/zabbix-veeam-rest
 
