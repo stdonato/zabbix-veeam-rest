@@ -5,7 +5,7 @@
 // ver 0.3
 // glukinho
 
-const LOCAL_TIMEZONE = "America/Manaus";
+const LOCAL_TIMEZONE = "America/Caracas";
 
 $results = [
 	'Success'	=> 0,
@@ -15,7 +15,7 @@ $results = [
 
 $debug_file = '/tmp/zabbix-veeam.log';
 
-$debug = false;
+$debug = true;
 
 
 function _dbg($text) {
